@@ -1,4 +1,6 @@
 import { AppModule } from "@/app.module";
+import { ResponseInterceptor } from "@/shared/interceptors/response.interceptor";
+import { HttpExceptionFilter } from "@/shared/filters/http-exception.filter";
 
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
@@ -18,6 +20,9 @@ async function bootstrap() {
 			transform: true,
 		}),
 	);
+
+	app.useGlobalInterceptors(new ResponseInterceptor());
+	app.useGlobalFilters(new HttpExceptionFilter());
 
 	const config = new DocumentBuilder()
 		.setTitle("NestJS CRUD Students & Pets")
