@@ -23,7 +23,10 @@ export class StudentsService {
 		const student = this.store.get(id);
 
 		if (!student) {
-			throw new NotFoundException("Estudiante no encontrado");
+			throw new NotFoundException({
+				error: "STUDENT_NOT_FOUND",
+				message: "Estudiante no encontrado",
+			});
 		}
 
 		return student;
@@ -77,7 +80,10 @@ export class StudentsService {
 			.some((student) => student.email === email);
 
 		if (exists) {
-			throw new ConflictException("El correo electrónico ya está en uso");
+			throw new ConflictException({
+				error: "STUDENT_EMAIL_ALREADY_EXISTS",
+				message: "El correo electrónico ya está en uso",
+			});
 		}
 	}
 }
