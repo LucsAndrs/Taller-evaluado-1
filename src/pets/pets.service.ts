@@ -68,7 +68,10 @@ export class PetsService {
 		const pet = this.store.get(petId);
 
 		if (!pet || pet.studentId !== studentId) {
-			throw new NotFoundException("Mascota no encontrada");
+			throw new NotFoundException({
+				error: "PET_NOT_FOUND",
+				message: "Mascota no encontrada",
+			});
 		}
 
 		return pet;
@@ -78,3 +81,4 @@ export class PetsService {
 		this.studentsService.findById(studentId);
 	}
 }
+
