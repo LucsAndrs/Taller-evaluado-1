@@ -1,68 +1,103 @@
-# CRUD Students
+# Estandar de respuestas JSON
+Todas las respuestas de la API, tanto de éxito como de error, siguen una misma estructura definida por la clase ApiResponse<T> (src/shared/responses/api-response.ts). Esta estructura se aplica automáticamente a todos los endpoints mediante un interceptor global (para respuestas exitosas) y un exception filter global (para errores), por lo que ningún controller necesita construir el formato de respuesta manualmente.
 
-Proyecto NestJS que implementa un **CRUD en memoria** para la entidad `Student`. No requiere base de datos ni contenedores: los datos viven en un `Map` dentro del servicio y se pierden al reiniciar la aplicación.
+## Estructura
 
-## Requerimientos
+  {
+  success: boolean;
+  error: { code: string; message: string } | null;
+  data: T | null;
+  meta: { timestamp: string; [key: string]: any };
+  }
 
-- Node.js 20+ (probado con Node 24)
-- pnpm
+success: Detalle, es un booleano que devuelve True si la operacion fue exitosa, o False si hubo un error.
+error: Detalle, es un string que devuelve un codigo especifico + un mensajes o null si success es True.
+data: Detalles, los datos de la respuesta o null si hubo un error
+meta: Detalle, metadatos de la respuesta, incluye la fecha y hora en formato ISO
 
-## Resumen funcional
+## Student
+### Ejemplo de exito (POST- /api/students)
 
-La API expone operaciones CRUD completas sobre estudiantes bajo `/api/students`:
+   {
+  "success": true,
+  "error": null,
+  "data": {
+    "id": "3893b567-06b3-46f1-b30b-e6487d3390e6",
+    "name": "Elias Cayuqueo",
+    "email": "ecayuqueo2026@alu.uct.cl",
+    "age": 23,
+    "createdAt": "2026-08-29T00:19:42.899Z",
+    "updatedAt": "2026-08-29T00:19:42.899Z"
+  },
+  "meta": {
+    "timestamp": "2026-08-29T00:19:42.900Z"
+  }
+}
 
-- **Crear**: `POST /api/students`
-- **Listar**: `GET /api/students`
-- **Buscar por id**: `GET /api/students/:id`
-- **Actualizar**: `PATCH /api/students/:id`
-- **Eliminar**: `DELETE /api/students/:id`
+### Ejemplo de error (GET- /api/students/{id})
 
-Cada estudiante tiene `id` (UUID), `name`, `email`, `age`, `createdAt` y `updatedAt`. El `email` es único: se rechaza con `409 Conflict` si ya existe.
+   {
+  "success": false,
+  "error": {
+    "code": "STUDENT_NOT_FOUND",
+    "message": "Estudiante no encontrado"
+  },
+  "data": null,
+  "meta": {
+    "timestamp": "2026-08-29T00:25:43.435Z"
+  }
+}
 
-La validación de entrada se realiza con `class-validator` a través de un `ValidationPipe` global:
+## Pets
+### Ejemplo de exito (POST- /api/students/{studentId}/pets)
 
-- `name`: texto de 3 a 100 caracteres, sin etiquetas HTML.
-- `email`: dirección de correo electrónico válida.
-- `age`: entero entre 18 y 99.
+   {
+  "success": true,
+  "error": null,
+  "data": {
+    "id": "27a3d294-e671-4806-bc07-98939c330ad6",
+    "studentId": "3893b567-06b3-46f1-b30b-e6487d3390e6",
+    "name": "michi",
+    "species": "Gato",
+    "age": 2,
+    "createdAt": "2026-08-29T00:29:38.711Z",
+    "updatedAt": "2026-08-29T00:29:38.711Z"
+  },
+  "meta": {
+    "timestamp": "2026-08-29T00:29:38.711Z"
+  }
+}
 
-## Contexto técnico
 
-- **Backend**: NestJS
-- **Almacenamiento**: en memoria (sin persistencia)
-- **Validación**: `class-validator` + `class-transformer`
-- **Documentación**: Swagger en `/docs`
+### Ejemplo de error (GET- /api/students/{studentId}/pets)
 
-## Ejecución local
+   {
+  "success": false,
+  "error": {
+    "code": "STUDENT_NOT_FOUND",
+    "message": "Estudiante no encontrado"
+  },
+  "data": null,
+  "meta": {
+    "timestamp": "2026-08-29T00:33:16.590Z"
+  }
+}
 
-1. Instalar dependencias:
+## Implementación por entidad
 
-   ```bash
-   pnpm install
-   ```
+Students (src/students/students.service.ts)
+Se revisaron los métodos findById, update, delete y create, agregando validaciones que antes no diferenciaban el tipo de error:
 
-2. Levantar el servidor en modo desarrollo:
+findById: si el id no existe, se lanza NotFoundException con código STUDENT_NOT_FOUND (en lugar de un mensaje genérico). Como update y delete reutilizan findById internamente, quedaron cubiertos con el mismo cambio.
+assertEmailAvailable (usado por create y update): si el email ya está registrado, se lanza ConflictException con código STUDENT_EMAIL_ALREADY_EXISTS.
 
-   ```bash
-   pnpm run start:dev
-   ```
+Pets (src/pets/pets.service.ts)
+Se revisó el método findOwned, usado internamente por update y delete:
 
-   O usando Make:
+Si el petId no existe, o existe pero no pertenece al studentId indicado, se lanza NotFoundException con código PET_NOT_FOUND.
+Adicionalmente, todos los métodos de pets (findAllForStudent, create, update, delete) validan primero que el studentId exista, reutilizando StudentsService.findById. Por eso, un studentId inexistente en cualquier endpoint de mascotas también devuelve STUDENT_NOT_FOUND.
 
-   ```bash
-   make install
-   make dev
-   ```
+En ambos casos, el cambio consistió en reemplazar el argumento de texto plano de la excepción por un objeto { error: "CODIGO", message: "texto" }, que el exception filter global toma y coloca directamente en el campo error.code de la respuesta.
 
-La aplicación queda disponible en:
 
-- `http://localhost:3000`
-- `http://localhost:3000/docs`
 
-## Comandos útiles
-
-- `make dev` — arranca NestJS en modo watch
-- `make build` — compila el proyecto
-- `make lint` — ejecuta ESLint
-- `make format` — formatea el código
-- `make format-check` — verifica el formato
-- `make clean` — elimina `dist`, `coverage` y `node_modules`
